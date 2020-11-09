@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 import scipy
+from scipy.sparse import csgraph
 from tqdm import tqdm, trange
 
 
@@ -68,14 +69,16 @@ def generate_benchmark_expansions(original, new_num_edges, num_trials=10):
 
 
 def adj_mat_to_norm_laplacian(adj_mat):
-    G = nx.from_numpy_matrix(adj_mat)
-    return nx.normalized_laplacian_matrix(G)
+    #G = nx.from_numpy_matrix(adj_mat)
+    #return nx.normalized_laplacian_matrix(G)
+    G = csgraph.csgraph_from_dense(adj_mat)
+    return csgraph.laplacian(G, normed=True)
 
 
 def create_random_subgraph(original, num_new_edges):
     out = np.zeros(original.shape)
     out = out.astype(int)
-    ratio = num_new_edges / np.sum(original)
+    ratio = num_new_edges / (np.sum(original)/2)
     for i in range(original.shape[0]):
         for j in range(i+1, original.shape[0]):
             # print(i, j)
@@ -129,7 +132,8 @@ def main():
 
     x1 = np.array([[0, 1, 1, 0], [1, 0, 1, 1], [1, 1, 0, 1], [0, 1, 1, 0]])
     x2 = np.array([[.23, 1.759, .546, 0], [.334, 0, .985, .254], [.713, .349, .215, .32], [0, .98, .213, 1]])
-    create_graph_from_output(x1, x2)
+    G = create_graph_from_output(x1, x2)
+    adj_mat_to_norm_laplacian(G)
     print(expected_num_edges(x1, x2))
 
 

@@ -1,5 +1,8 @@
 import numpy as np
+import scipy.stats as st
 import tensorflow as tf
+import seaborn as sns
+import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 from GraphOps import *
 from MultiLayerAE import *
@@ -10,6 +13,7 @@ def main():
     # tf.keras.backend.set_floatx('float64')
 
     num_nodes = 28
+    #num_nodes = 100
     # probabilities = [.5, .6, .7, .8, .9]
     probabilities = [.75]
     num_graphs = 100
@@ -25,6 +29,7 @@ def main():
     learning_rate = 1e-3
     original_dim = num_nodes ** 2
     l1_reg_const = 1e-5
+    #l1_reg_const = 1e-4
 
     intermediate_dim = 64
     inter_dim1 = 256
@@ -73,10 +78,10 @@ def main():
         tf.print(loss_values)
 
     cols = adj_matrices.reshape(adj_matrices.shape[0], adj_matrices.shape[1] * adj_matrices.shape[2])
-    # print(adj_matrices.shape, cols.shape)
+    #print(adj_matrices.shape, cols.shape)
     outputs = tf.reshape(autoencoder(tf.constant(cols)), (cols.shape[0], num_nodes, num_nodes))
     outputs = np.array([out.numpy() for out in outputs])
-    # print(outputs.shape)
+    #print(outputs.shape)
 
     if save_graphs:
         with open(adj_mat_file, 'wb') as f:
@@ -98,24 +103,55 @@ def main():
         # new_edge_expansion = estimate_edge_expansion(adj_mat_to_norm_laplacian(new))
         new_edge_expansion = estimate_output_edge_expansion(original, new, num_trials=10)
         benchmark_expansions = generate_benchmark_expansions(original, expected_num_edges(original, new))
-        result = np.array([np.sum(original), expected_num_edges(original, new),
+        result = np.array([np.sum(original)/2, expected_num_edges(original, new),
                            orig_edge_expansion[0], orig_edge_expansion[1],
                            new_edge_expansion[0], new_edge_expansion[1],
                            benchmark_expansions[0], benchmark_expansions[1]])
         values.append(result)
         # print(result)
 
-    print(values)
+    #print(values)
+    pretty_print(values[-10:])
+    print(metrics(values))
+    ax = sns.kdeplot(original.flatten(), bw=0.01)
+    sns.kdeplot(outputs.flatten(), bw=0.01)
+    ax.set(xlabel='outputs', ylabel='density')
+    
+    #print(autoencoder.encoder.hidden_layer1.get_weights())
+    
     with open(ratio_file, 'wb') as f:
         np.save(f, values)
 
+def pretty_print(values):
+    for result in values:
+        result = np.round(result, 3)
+        print(f"""old # edges: {result[0]}, expected new # edges: {result[1]},
+               old expansion lower bound: {result[2]}, old expansion upper bound: {result[3]},
+               new expansion lower bound: {result[4]}, new expansion upper bound: {result[5]},
+               benchmark lower bound: {result[6]}, benchmark upper bound: {result[7]}""")
+        
+def metrics(values):
+    # identify performance metrics based on values
+    value_arr = np.array(values)
+    sparsity = value_arr[:, 0]/value_arr[:, 1]
+    expansion_loss = value_arr[:, 2]/value_arr[:, 4]
+    benchmark_loss = value_arr[:, 2]/value_arr[:, 6]
+    mean_sparsity = np.mean(sparsity)
+    mean_expansion_loss = np.mean(expansion_loss) 
+    mean_benchmark_loss = np.mean(benchmark_loss)
+    sparsity_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(sparsity), scale=st.sem(sparsity))
+    expansion_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(expansion_loss), scale=st.sem(expansion_loss))
+    benchmark_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(benchmark_loss), scale=st.sem(benchmark_loss))
+    
+    return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
 
 def read_ratios(file):
     ratio_file = file
     # result = np.array([])
     with open(ratio_file, 'rb') as f:
         result = np.load(f)
-    print(result)
+    #print(result)
+    pretty_print(result)
 
 
 def generate_benchmarks(ratio_file):
