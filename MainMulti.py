@@ -24,12 +24,13 @@ def main():
 
     adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
 
-    batch_size = 28
+    batch_size = 32
     epochs = 3
     learning_rate = 1e-3
     original_dim = num_nodes ** 2
     l1_reg_const = 1e-5
-    #l1_reg_const = 1e-4
+    eigen_const = 1e-3  # should be positive
+    # l1_reg_const = 1e-4
 
     intermediate_dim = 64
     inter_dim1 = 256
@@ -64,8 +65,8 @@ def main():
             #     print(autoencoder(batch_features))
             # exit(0)
             # print(batch_features)
-            train(loss, autoencoder, opt, batch_features, l1_reg_const)
-            loss_values = loss(autoencoder, batch_features, l1_reg_const)
+            train(loss, autoencoder, opt, batch_features, l1_reg_const, eigen_const)
+            loss_values = loss(autoencoder, batch_features, l1_reg_const, eigen_const)
             original = tf.reshape(batch_features, (batch_features.shape[0], num_nodes, num_nodes))
             reconstructed = tf.reshape(autoencoder(tf.constant(batch_features)),
                                        (batch_features.shape[0], num_nodes, num_nodes))
@@ -113,14 +114,15 @@ def main():
     #print(values)
     pretty_print(values[-10:])
     print(metrics(values))
-    ax = sns.kdeplot(original.flatten(), bw=0.01)
-    sns.kdeplot(outputs.flatten(), bw=0.01)
+    ax = sns.kdeplot(original.flatten(), bw_method=0.01)
+    sns.kdeplot(outputs.flatten(), bw_method=0.01)
     ax.set(xlabel='outputs', ylabel='density')
     
     #print(autoencoder.encoder.hidden_layer1.get_weights())
     
     with open(ratio_file, 'wb') as f:
         np.save(f, values)
+
 
 def pretty_print(values):
     for result in values:
@@ -129,7 +131,8 @@ def pretty_print(values):
                old expansion lower bound: {result[2]}, old expansion upper bound: {result[3]},
                new expansion lower bound: {result[4]}, new expansion upper bound: {result[5]},
                benchmark lower bound: {result[6]}, benchmark upper bound: {result[7]}""")
-        
+
+
 def metrics(values):
     # identify performance metrics based on values
     value_arr = np.array(values)
@@ -144,6 +147,7 @@ def metrics(values):
     benchmark_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(benchmark_loss), scale=st.sem(benchmark_loss))
     
     return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
+
 
 def read_ratios(file):
     ratio_file = file

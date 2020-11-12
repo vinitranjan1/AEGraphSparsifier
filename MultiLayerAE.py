@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from GraphOps import *
 
 
 def plateau_relu(x):
@@ -87,14 +88,55 @@ class MultiLayerAutoencoder(tf.keras.Model):
         return reconstructed
 
 
-def loss(model, original, l1_const):
+@tf.custom_gradient
+def custom_eigenloss(output, original):
+    # model_outs = tf.zeros(tf.shape(output))
+    model_outs = np.zeros(tf.shape(output), dtype=np.float32)
+    lambda1_vals = []
+    for i in range(tf.shape(output)[0]):
+        first_output = output[i]
+        first_orig = original[i]
+        # print(first_output.shape, i)
+        new_size = np.int(first_output.shape[0] ** .5)
+        square_output = np.reshape(first_output, (new_size, new_size))
+        square_original = np.reshape(first_orig, (new_size, new_size))
+
+        G = create_graph_from_output(square_output, square_original)
+        G = adj_mat_to_norm_laplacian(G)
+        # print(G, G.shape)
+        # exit(0)
+        eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
+        idx = np.argsort(eigvals)
+        eigvals = eigvals[idx]
+        eigvecs = eigvecs[:, idx]
+        lambda_1 = eigvals[1]
+        lambda1_vals.append(lambda_1)
+        l1_eigvec = eigvecs[:, 1]
+        eig_outer = np.outer(l1_eigvec, l1_eigvec)
+        eig_outer = np.reshape(eig_outer, len(l1_eigvec) ** 2)
+        model_outs[i] = eig_outer
+    model_outs = tf.convert_to_tensor(model_outs)
+
+    def grad(dABydW):
+        deBydW = dABydW * model_outs  # this is element wise multiply
+        return deBydW, None
+
+    return tf.constant(np.sum(lambda1_vals), dtype=tf.float32), grad
+
+
+def loss(model, original, l1_const, eigen_const):
+    # print(original)
+    # print(model(original))
     reconstruction_error = tf.reduce_mean(tf.square(model(original) - original)) \
-                           + l1_const * tf.reduce_sum(tf.abs(model(original) - original))  # TODO: replace w/ general const
+                           + l1_const * tf.reduce_sum(tf.abs(model(original))) \
+                           - eigen_const * custom_eigenloss(model(original), original)
+
     return reconstruction_error
 
 
-def train(loss, model, opt, original, l1_const):
+def train(loss, model, opt, original, l1_const, eigen_const):
     with tf.GradientTape() as tape:
-        gradients = tape.gradient(loss(model, original, l1_const), model.trainable_variables)
+        gradients = tape.gradient(loss(model, original, l1_const, eigen_const), model.trainable_variables)
+    # print(tf.shape(gradients))
     gradient_variables = zip(gradients, model.trainable_variables)
     opt.apply_gradients(gradient_variables)
