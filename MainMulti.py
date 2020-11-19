@@ -25,17 +25,21 @@ def main():
     adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
 
     batch_size = 32
-    epochs = 3
-    learning_rate = 1e-3
+    epochs = 10
+    learning_rate = 1e-5
     original_dim = num_nodes ** 2
-    l1_reg_const = 1e-5
-    eigen_const = 1e-3  # should be positive
+    l2_reg_const = 1
+    l1_reg_const = 0
+    eigen_const = 5e-4  # should be positive
     # l1_reg_const = 1e-4
 
     intermediate_dim = 64
+    # inter_dim1 = 256
+    # inter_dim2 = 128
+    # inter_dim3 = 64
     inter_dim1 = 256
     inter_dim2 = 128
-    inter_dim3 = 64
+    inter_dim3 = 32
 
     training_features = adj_matrices
 
@@ -65,8 +69,8 @@ def main():
             #     print(autoencoder(batch_features))
             # exit(0)
             # print(batch_features)
-            train(loss, autoencoder, opt, batch_features, l1_reg_const, eigen_const)
-            loss_values = loss(autoencoder, batch_features, l1_reg_const, eigen_const)
+            train(loss, autoencoder, opt, batch_features, l2_reg_const, l1_reg_const, eigen_const)
+            loss_values = loss(autoencoder, batch_features, l2_reg_const, l1_reg_const, eigen_const)
             original = tf.reshape(batch_features, (batch_features.shape[0], num_nodes, num_nodes))
             reconstructed = tf.reshape(autoencoder(tf.constant(batch_features)),
                                        (batch_features.shape[0], num_nodes, num_nodes))

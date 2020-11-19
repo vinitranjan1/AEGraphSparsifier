@@ -117,18 +117,39 @@ def f1(A, x):
 
 #for y= Ax, the derivative is: dy/dx= transpose(A)
 @tf.custom_gradient
-def f2(A, x):
-    y, z = f1(A, x)
+def custom_eigenloss(output, original):
+    # model_outs = tf.zeros(tf.shape(output))
+    model_outs = np.zeros(tf.shape(output), dtype=np.float32)
+    lambda1_vals = []
+    for i in range(tf.shape(output)[0]):
+        first_output = output[i]
+        first_orig = original[i]
+        # print(first_output.shape, i)
+        new_size = np.int(first_output.shape[0] ** .5)
+        square_output = np.reshape(first_output, (new_size, new_size))
+        square_original = np.reshape(first_orig, (new_size, new_size))
 
-    def grad(dzByDy): # dz/dy = 2y reaches here correctly.
-        print(tf.shape(A), tf.shape(dzByDy))
-        # dzByDx = 2 * tf.matmul(tf.expand_dims(A[0], 0), dzByDy)
-        # dzByDx = 2 * tf.matmul(A, dzByDy)  # dzbydy is the type of the OUTPUT BELOW
-        dzByDx = dzByDy * A
-        return dzByDx, None
-    # print(tf.shape(y))
-    # return y[0][0], grad
-    return tf.constant(0, dtype=tf.float32), grad
+        G = create_graph_from_output(square_output, square_original)
+        G = adj_mat_to_norm_laplacian(G)
+        # print(G, G.shape)
+        # exit(0)
+        eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
+        idx = np.argsort(eigvals)
+        eigvals = eigvals[idx]
+        eigvecs = eigvecs[:, idx]
+        lambda_1 = eigvals[1]
+        lambda1_vals.append(lambda_1)
+        l1_eigvec = eigvecs[:, 1]
+        eig_outer = np.outer(l1_eigvec, l1_eigvec)
+        eig_outer = np.reshape(eig_outer, len(l1_eigvec) ** 2)
+        model_outs[i] = eig_outer
+    model_outs = tf.convert_to_tensor(model_outs)
+
+    def grad(dABydW):
+        deBydW = dABydW * model_outs  # this is element wise multiply
+        return deBydW, None
+
+    return tf.constant(np.sum(lambda1_vals), dtype=tf.float32), grad
 
 
 def loss(model, original):

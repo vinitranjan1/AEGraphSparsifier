@@ -120,23 +120,24 @@ def custom_eigenloss(output, original):
     def grad(dABydW):
         deBydW = dABydW * model_outs  # this is element wise multiply
         return deBydW, None
+        # return None, deBydW
 
     return tf.constant(np.sum(lambda1_vals), dtype=tf.float32), grad
 
 
-def loss(model, original, l1_const, eigen_const):
+def loss(model, original, l2_const, l1_const, eigen_const):
     # print(original)
     # print(model(original))
-    reconstruction_error = tf.reduce_mean(tf.square(model(original) - original)) \
+    reconstruction_error = l2_const * tf.reduce_mean(tf.square(model(original) - original)) \
                            + l1_const * tf.reduce_sum(tf.abs(model(original))) \
                            - eigen_const * custom_eigenloss(model(original), original)
 
     return reconstruction_error
 
 
-def train(loss, model, opt, original, l1_const, eigen_const):
+def train(loss, model, opt, original, l2_const, l1_const, eigen_const):
     with tf.GradientTape() as tape:
-        gradients = tape.gradient(loss(model, original, l1_const, eigen_const), model.trainable_variables)
+        gradients = tape.gradient(loss(model, original, l2_const, l1_const, eigen_const), model.trainable_variables)
     # print(tf.shape(gradients))
     gradient_variables = zip(gradients, model.trainable_variables)
     opt.apply_gradients(gradient_variables)
