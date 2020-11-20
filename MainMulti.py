@@ -25,7 +25,7 @@ def main():
     adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
 
     batch_size = 32
-    epochs = 20
+    epochs = 30
     learning_rate = 1e-4
     original_dim = num_nodes ** 2
     l2_reg_const = 1
@@ -33,13 +33,13 @@ def main():
     eigen_const = 5e-4  # should be positive
     # l1_reg_const = 1e-4
 
-    intermediate_dim = 64
+    intermediate_dim = 256
     # inter_dim1 = 256
     # inter_dim2 = 128
     # inter_dim3 = 64
     inter_dim1 = 256
-    inter_dim2 = 128
-    inter_dim3 = 32
+    inter_dim2 = 256
+    inter_dim3 = 256
 
     training_features = adj_matrices
 

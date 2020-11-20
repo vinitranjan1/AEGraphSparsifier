@@ -12,19 +12,21 @@ class MultiLayerEncoder(tf.keras.layers.Layer):
         super(MultiLayerEncoder, self).__init__()
         self.hidden_layer1 = tf.keras.layers.Dense(
             units=inter_dim1,
-            # activation=tf.nn.relu,
-            activation=plateau_relu,
+             activation=tf.nn.relu,
+            #activation=plateau_relu,
             kernel_initializer='he_uniform'
         )
         self.hidden_layer2 = tf.keras.layers.Dense(
             units=inter_dim2,
-            # activation=tf.nn.relu,
-            activation=plateau_relu,
+            activation=tf.nn.relu,
+            #activation=plateau_relu,
             kernel_initializer='he_uniform'
         )
         self.output_layer = tf.keras.layers.Dense(
             units=inter_dim3,
-            activation=plateau_relu
+            #activation=plateau_relu
+            activation=tf.nn.relu,
+            kernel_initializer='he_uniform'
         )
 
     def call(self, input_features):
@@ -44,21 +46,22 @@ class MultiLayerDecoder(tf.keras.layers.Layer):
         # )
         self.hidden_layer2 = tf.keras.layers.Dense(
             units=inter_dim2,
-            # activation=tf.nn.relu,
-            activation=plateau_relu,
+            activation=tf.nn.relu,
+            #activation=plateau_relu,
             kernel_initializer='he_uniform'
         )
         self.hidden_layer3 = tf.keras.layers.Dense(
             units=inter_dim1,
-            # activation=tf.nn.relu,
-            activation=plateau_relu,
+            activation=tf.nn.relu,
+            #activation=plateau_relu,
             kernel_initializer='he_uniform'
         )
         self.output_layer = tf.keras.layers.Dense(
             units=original_dim,
-            activation=plateau_relu
+            activation=plateau_relu,
+            #activation=tf.nn.relu,
+            kernel_initializer='he_uniform'
         )
-
     def call(self, code):
         # layer1 = self.hidden_layer1(code)
         layer1 = code  # quick fix to remove the double bottleneck layer
