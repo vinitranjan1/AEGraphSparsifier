@@ -3,53 +3,6 @@ import numpy as np
 import tensorflow as tf
 from GraphOps import *
 
-np.random.seed(1)
-tf.random.set_seed(1)
-batch_size = 12
-epochs = 3
-learning_rate = 1e-2
-intermediate_dim = 64
-original_dim = 784
-
-print('loading data')
-num_nodes = 28
-#num_nodes = 100
-# probabilities = [.5, .6, .7, .8, .9]
-probabilities = [.75]
-num_graphs = 100
-graph_file = None
-adj_mat_file = 'graphs/adj_mat.npy'
-out_mat_file = 'graphs/out_mat.npy'
-save_graphs = False
-
-adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
-
-batch_size = 32
-epochs = 3
-learning_rate = 1e-3
-original_dim = num_nodes ** 2
-l1_reg_const = 1e-5
-eigen_const = 1e-5 #should be positive
-#l1_reg_const = 1e-4
-
-training_features = adj_matrices
-
-intermediate_dim = 64
-inter_dim1 = 256
-inter_dim2 = 128
-inter_dim3 = 64
-
-
-training_features = training_features / np.max(training_features)
-training_features = training_features.reshape(training_features.shape[0],
-                                              training_features.shape[1] * training_features.shape[2])
-training_features = training_features.astype('float32')
-
-training_dataset = tf.data.Dataset.from_tensor_slices(training_features)
-training_dataset = training_dataset.batch(batch_size)
-training_dataset = training_dataset.shuffle(training_features.shape[0])
-training_dataset = training_dataset.prefetch(batch_size * 4)
-
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, intermediate_dim):
@@ -79,7 +32,7 @@ class Decoder(tf.keras.layers.Layer):
         )
         self.output_layer = tf.keras.layers.Dense(
             units=original_dim,
-            activation=tf.nn.sigmoid
+            activation=tf.nn.relu
         )
 
     def call(self, code):
@@ -102,19 +55,6 @@ class Autoencoder(tf.keras.Model):
         return reconstructed
 
 
-autoencoder = Autoencoder(
-    intermediate_dim=intermediate_dim,
-    original_dim=original_dim
-)
-opt = tf.optimizers.Adam(learning_rate=learning_rate)
-
-
-def f1(A, x):
-    # B = np.outer(A, A)
-    y = tf.matmul(A, x, transpose_a=True, name='y')
-    return y, y
-
-
 #for y= Ax, the derivative is: dy/dx= transpose(A)
 @tf.custom_gradient
 def custom_eigenloss(output, original):
@@ -127,13 +67,9 @@ def custom_eigenloss(output, original):
         # print(first_output.shape, i)
         new_size = np.int(first_output.shape[0] ** .5)
         square_output = np.reshape(first_output, (new_size, new_size))
-        square_original = np.reshape(first_orig, (new_size, new_size))
+        # square_original = np.reshape(first_orig, (new_size, new_size))
 
-        G = create_graph_from_output(square_output, square_original)
-        G = adj_mat_to_norm_laplacian(G)
-        # print(G, G.shape)
-        # exit(0)
-        eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
+        eigvals, eigvecs = np.linalg.eig(square_output)
         idx = np.argsort(eigvals)
         eigvals = eigvals[idx]
         eigvecs = eigvecs[:, idx]
@@ -149,12 +85,15 @@ def custom_eigenloss(output, original):
         deBydW = dABydW * model_outs  # this is element wise multiply
         return deBydW, None
 
-    return tf.constant(np.sum(lambda1_vals), dtype=tf.float32), grad
+    return tf.constant(np.mean(lambda1_vals), dtype=tf.float32), grad
 
 
 def loss(model, original):
-    reconstruction_error = tf.reduce_mean(tf.square(tf.subtract(model(original), original))) \
-                           + f2(model(original), original)
+    # reconstruction_error = tf.reduce_mean(tf.square(tf.subtract(model(original), original))) \
+    #                        + f2(model(original), original)
+    reconstruction_error = -1 * custom_eigenloss(model(original), original)
+    # reconstruction_error = custom_eigenloss(model(original), original)
+    # reconstruction_error = tf.constant(-1, dtype=tf.float32)
     return reconstruction_error
 
 
@@ -165,19 +104,81 @@ def train(loss, model, opt, original):
     opt.apply_gradients(gradient_variables)
 
 
-writer = tf.summary.create_file_writer('tmp')
+def main():
+    # np.random.seed(1)
+    # tf.random.set_seed(1)
 
-with writer.as_default():
-    with tf.summary.record_if(True):
-        for epoch in range(epochs):
-            print('epoch: ', epoch)
-            for step, batch_features in enumerate(training_dataset):
-                train(loss, autoencoder, opt, batch_features)
-                loss_values = loss(autoencoder, batch_features)
-                original = tf.reshape(batch_features, (batch_features.shape[0], 28, 28, 1))
-                reconstructed = tf.reshape(autoencoder(tf.constant(batch_features)),
-                                           (batch_features.shape[0], 28, 28, 1))
-                # tf.summary.scalar('loss', loss_values, step=step)
-                # tf.summary.image('original', original, max_outputs=10, step=step)
-                # tf.summary.image('reconstructed', reconstructed, max_outputs=10, step=step)
-            tf.print(loss_values)
+    print('loading data')
+    num_nodes = 28
+
+    graphs = []
+    num_graphs = 10
+    for _ in range(num_graphs):
+        mat = np.random.rand(num_nodes, num_nodes) * 20
+        graphs.append(mat.T @ mat)
+
+    graphs = np.array(graphs)
+
+    for g in graphs:
+        eigvals, eigvecs = np.linalg.eig(g)
+        idx = np.argsort(eigvals)
+        eigvals = eigvals[idx]
+        eigvecs = eigvecs[:, idx]
+        lambda_1 = eigvals[1]
+        print(lambda_1)
+
+    batch_size = 32
+    epochs = 20
+    learning_rate = 1e-4
+    original_dim = num_nodes ** 2
+    l1_reg_const = 1e-5
+    eigen_const = 1e-5  # should be positive
+
+    training_features = graphs
+
+    intermediate_dim = 784
+
+    training_features = training_features / np.max(training_features)
+    training_features = training_features.reshape(training_features.shape[0],
+                                                  training_features.shape[1] * training_features.shape[2])
+    training_features = training_features.astype('float32')
+
+    training_dataset = tf.data.Dataset.from_tensor_slices(training_features)
+    training_dataset = training_dataset.batch(batch_size)
+    training_dataset = training_dataset.shuffle(training_features.shape[0])
+    training_dataset = training_dataset.prefetch(batch_size * 4)
+
+    writer = tf.summary.create_file_writer('tmp')
+
+    autoencoder = Autoencoder(
+        intermediate_dim=intermediate_dim,
+        original_dim=original_dim
+    )
+    opt = tf.optimizers.Adam(learning_rate=learning_rate)
+
+    with writer.as_default():
+        with tf.summary.record_if(True):
+            for epoch in range(epochs):
+                print('epoch: ', epoch)
+                for step, batch_features in enumerate(training_dataset):
+                    train(loss, autoencoder, opt, batch_features)
+                    loss_values = loss(autoencoder, batch_features)
+                    original = tf.reshape(batch_features, (batch_features.shape[0], 28, 28, 1))
+                    reconstructed = tf.reshape(autoencoder(tf.constant(batch_features)),
+                                               (batch_features.shape[0], 28, 28, 1))
+                    # tf.summary.scalar('loss', loss_values, step=step)
+                    # tf.summary.image('original', original, max_outputs=10, step=step)
+                    # tf.summary.image('reconstructed', reconstructed, max_outputs=10, step=step)
+                tf.print(loss_values)
+                for g in reconstructed:
+                    square = np.reshape(g, (num_nodes, num_nodes))
+                    eigvals, eigvecs = np.linalg.eig(square)
+                    idx = np.argsort(eigvals)
+                    eigvals = eigvals[idx]
+                    eigvecs = eigvecs[:, idx]
+                    lambda_1 = eigvals[1]
+                    print(lambda_1)
+
+
+if __name__ == '__main__':
+    main()
