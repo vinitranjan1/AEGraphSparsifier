@@ -30,9 +30,10 @@ class MultiLayerEncoder(tf.keras.layers.Layer):
         )
 
     def call(self, input_features):
-        layer1 = self.hidden_layer1(input_features)
-        layer2 = self.hidden_layer2(layer1)
-        return self.output_layer(layer2)
+        #layer1 = self.hidden_layer1(input_features)
+        #layer2 = self.hidden_layer2(layer1)
+        #return self.output_layer(layer2)
+        return self.output_layer(input_features)
 
 
 class MultiLayerDecoder(tf.keras.layers.Layer):
@@ -64,10 +65,12 @@ class MultiLayerDecoder(tf.keras.layers.Layer):
         )
     def call(self, code):
         # layer1 = self.hidden_layer1(code)
-        layer1 = code  # quick fix to remove the double bottleneck layer
-        layer2 = self.hidden_layer2(layer1)
-        layer3 = self.hidden_layer3(layer2)
-        return self.output_layer(layer3)
+        #layer1 = code  # quick fix to remove the double bottleneck layer
+        #layer2 = self.hidden_layer2(layer1)
+        #layer3 = self.hidden_layer3(layer2)
+        #return self.output_layer(layer3)
+        # can leave this and comment out previous four lines to perform network surgery
+        return self.output_layer(code) 
 
 
 class MultiLayerAutoencoder(tf.keras.Model):
@@ -132,7 +135,7 @@ def loss(model, original, l2_const, l1_const, eigen_const):
     # print(original)
     # print(model(original))
     reconstruction_error = l2_const * tf.reduce_mean(tf.square(model(original) - original)) \
-                           + l1_const * tf.reduce_sum(tf.abs(model(original))) \
+                           + l1_const * tf.reduce_mean(tf.abs(model(original))) \
                            - eigen_const * custom_eigenloss(model(original), original)
 
     return reconstruction_error
