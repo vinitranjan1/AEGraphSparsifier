@@ -25,8 +25,8 @@ def main():
     adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
 
     batch_size = 32
-    epochs = 10
-    learning_rate = 1e-5
+    epochs = 20
+    learning_rate = 1e-4
     original_dim = num_nodes ** 2
     l2_reg_const = 1
     l1_reg_const = 0

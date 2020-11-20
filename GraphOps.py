@@ -101,7 +101,8 @@ def create_graph_from_output(original, new, edge_function=max):
             # print(i, j)
             r = np.random.uniform(0, 1)
             # print(r)
-            if original[i][j] and r < edge_function(new[i][j], new[j][i]):
+            # if original[i][j] and r < edge_function(new[i][j], new[j][i]):
+            if original[i][j] and r < np.mean((new[i][j], new[j][i])):
                 out[i][j] = 1
                 out[j][i] = 1
     # print(original)
