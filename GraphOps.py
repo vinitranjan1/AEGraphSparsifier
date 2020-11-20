@@ -85,6 +85,7 @@ def create_random_subgraph(original, num_new_edges):
             r = np.random.uniform(0, 1)
             # print(r)
             if original[i][j] and r < ratio:
+            #if r < ratio:
                 out[i][j] = 1
                 out[j][i] = 1
     # print(original)
@@ -103,6 +104,7 @@ def create_graph_from_output(original, new, edge_function=max):
             # print(r)
             # if original[i][j] and r < edge_function(new[i][j], new[j][i]):
             if original[i][j] and r < np.mean((new[i][j], new[j][i])):
+            #if r < np.mean((new[i][j], new[j][i])):
                 out[i][j] = 1
                 out[j][i] = 1
     # print(original)
@@ -116,7 +118,8 @@ def expected_num_edges(original, new, edge_function=max):
     for i in range(original.shape[0]):
         for j in range(i+1, original.shape[0]):
             if original[i][j]:
-                out += edge_function(new[i][j], new[j][i])
+                #out += edge_function(new[i][j], new[j][i])
+                out += np.mean([new[i][j], new[j][i]])
     return out
 
 
