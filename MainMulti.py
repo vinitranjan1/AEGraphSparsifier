@@ -12,11 +12,13 @@ def main():
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     # tf.keras.backend.set_floatx('float64')
 
-    num_nodes = 28
+    num_nodes = 4
+    #num_nodes = 28
     #num_nodes = 100
     # probabilities = [.5, .6, .7, .8, .9]
     probabilities = [.75]
     num_graphs = 100
+    #num_graphs = 200
     graph_file = None
     adj_mat_file = 'graphs/adj_mat.npy'
     out_mat_file = 'graphs/out_mat.npy'
@@ -24,22 +26,23 @@ def main():
 
     adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
 
-    batch_size = 32
-    epochs = 20
-    learning_rate = 1e-4
+    #batch_size = 32
+    batch_size = 10
+    epochs = 50
+    learning_rate = 1e-2
     original_dim = num_nodes ** 2
     l2_reg_const = 1
     l1_reg_const = 0
-    eigen_const = 5e-4  # should be positive
+    eigen_const = 0  # should be positive
     # l1_reg_const = 1e-4
 
-    intermediate_dim = 256
+    # intermediate_dim = 256
     # inter_dim1 = 256
     # inter_dim2 = 128
     # inter_dim3 = 64
-    inter_dim1 = 256
-    inter_dim2 = 256
-    inter_dim3 = 256
+    inter_dim1 = original_dim
+    inter_dim2 = original_dim
+    inter_dim3 = original_dim
 
     training_features = adj_matrices
 
@@ -51,7 +54,7 @@ def main():
     training_dataset = tf.data.Dataset.from_tensor_slices(training_features)
     training_dataset = training_dataset.batch(batch_size)
     training_dataset = training_dataset.shuffle(training_features.shape[0])
-    training_dataset = training_dataset.prefetch(batch_size * 4)
+    training_dataset = training_dataset.prefetch(batch_size * 5)
 
     autoencoder = MultiLayerAutoencoder(
         inter_dim1=inter_dim1,
@@ -59,10 +62,18 @@ def main():
         inter_dim3=inter_dim3,
         original_dim=original_dim
     )
-    opt = tf.optimizers.Adam(learning_rate=learning_rate)
+    #opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            learning_rate,
+            decay_steps=40*(num_graphs//batch_size),
+            decay_rate=0.1,
+            staircase=True)
+    opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+    #opt = tf.keras.optimizers.Adagrad(learning_rate=lr_schedule)
 
     for epoch in range(epochs):
         print("Epoch number %d" % epoch)
+        #print("Learning rate %f" % round(opt.lr.numpy(), 6)) # doesn't actually work
         for step, batch_features in enumerate(training_dataset):
             # if epoch == 9:
             #     print(batch_features)
@@ -101,7 +112,7 @@ def main():
     for i in trange(cols.shape[0], desc='edge expansions: '):
         original = adj_matrices[i]
         new = outputs[i]
-        # print(new)
+        #print(original-new)
         # print(adj_mat_to_norm_laplacian(new))
         # print(new)
         orig_edge_expansion = estimate_edge_expansion(adj_mat_to_norm_laplacian(original))
@@ -115,12 +126,17 @@ def main():
         values.append(result)
         # print(result)
 
+    corr = scipy.stats.pearsonr(adj_matrices.flatten(), outputs.flatten())
     #print(values)
+    print(f"Correlation between input and output: {corr}")
     pretty_print(values[-10:])
     print(metrics(values))
-    ax = sns.kdeplot(original.flatten(), bw_method=0.01)
+    ax = sns.kdeplot(adj_matrices.flatten(), bw_method=0.01)
     sns.kdeplot(outputs.flatten(), bw_method=0.01)
-    ax.set(xlabel='outputs', ylabel='density')
+    ax.set(xlabel='inputs/outputs', ylabel='density')
+    plt.figure()
+    ax2 = sns.kdeplot(adj_matrices.flatten()-outputs.flatten(), bw_method=0.01)
+    ax2.set(xlabel='error', ylabel='density')
     
     #print(autoencoder.encoder.hidden_layer1.get_weights())
     
@@ -149,9 +165,8 @@ def metrics(values):
     sparsity_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(sparsity), scale=st.sem(sparsity))
     expansion_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(expansion_loss), scale=st.sem(expansion_loss))
     benchmark_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(benchmark_loss), scale=st.sem(benchmark_loss))
-    
-    return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
-
+    #return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
+    return mean_sparsity, mean_expansion_loss, mean_benchmark_loss
 
 def read_ratios(file):
     ratio_file = file
