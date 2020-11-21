@@ -30,10 +30,10 @@ class MultiLayerEncoder(tf.keras.layers.Layer):
         )
 
     def call(self, input_features):
-        #layer1 = self.hidden_layer1(input_features)
-        #layer2 = self.hidden_layer2(layer1)
-        #return self.output_layer(layer2)
-        return self.output_layer(input_features)
+        layer1 = self.hidden_layer1(input_features)
+        layer2 = self.hidden_layer2(layer1)
+        return self.output_layer(layer2)
+        #return self.output_layer(input_features)
 
 
 class MultiLayerDecoder(tf.keras.layers.Layer):
@@ -59,7 +59,7 @@ class MultiLayerDecoder(tf.keras.layers.Layer):
         )
         self.output_layer = tf.keras.layers.Dense(
             units=original_dim,
-            activation=plateau_relu,
+            #activation=plateau_relu,
             #activation=tf.nn.relu,
             kernel_initializer='he_uniform'
         )
