@@ -40,8 +40,10 @@ def estimate_edge_expansion(norm_laplacian):
     lambda_1 = np.sort(eigvals)[1]
     # print(lambda_1)
 
-    edge_exp_lo = lambda_1/2
-    edge_exp_hi = np.sqrt(2*lambda_1)
+    edge_exp_lo = np.real(lambda_1/2)
+    edge_exp_hi = np.real(np.sqrt(2*lambda_1))
+    #edge_exp_lo = lambda_1/2
+    #edge_exp_hi = np.sqrt(2*lambda_1)
 
     return np.array([edge_exp_lo, edge_exp_hi])
 

@@ -12,8 +12,8 @@ def main():
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     # tf.keras.backend.set_floatx('float64')
 
-    #num_nodes = 4
-    num_nodes = 28
+    num_nodes = 10
+    #num_nodes = 28
     #num_nodes = 100
     # probabilities = [.5, .6, .7, .8, .9]
     probabilities = [.75]
@@ -26,13 +26,13 @@ def main():
 
     adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
 
-    #batch_size = 32
-    batch_size = 10
-    epochs = 20
+    batch_size = 32
+    #batch_size = 10
+    epochs = 15
     learning_rate = 1e-2
     original_dim = num_nodes ** 2
     l2_reg_const = 1
-    l1_reg_const = 0
+    l1_reg_const = 0.1
     eigen_const = 0  # should be positive
     # l1_reg_const = 1e-4
 
@@ -54,7 +54,7 @@ def main():
     training_dataset = tf.data.Dataset.from_tensor_slices(training_features)
     training_dataset = training_dataset.batch(batch_size)
     training_dataset = training_dataset.shuffle(training_features.shape[0])
-    training_dataset = training_dataset.prefetch(batch_size * 5)
+    training_dataset = training_dataset.prefetch(batch_size * 4)
 
     autoencoder = MultiLayerAutoencoder(
         inter_dim1=inter_dim1,
@@ -82,9 +82,9 @@ def main():
             # print(batch_features)
             train(loss, autoencoder, opt, batch_features, l2_reg_const, l1_reg_const, eigen_const)
             loss_values = loss(autoencoder, batch_features, l2_reg_const, l1_reg_const, eigen_const)
-            original = tf.reshape(batch_features, (batch_features.shape[0], num_nodes, num_nodes))
-            reconstructed = tf.reshape(autoencoder(tf.constant(batch_features)),
-                                       (batch_features.shape[0], num_nodes, num_nodes))
+            # original = tf.reshape(batch_features, (batch_features.shape[0], num_nodes, num_nodes))
+            # reconstructed = tf.reshape(autoencoder(tf.constant(batch_features)),
+            #                           (batch_features.shape[0], num_nodes, num_nodes))
             # original = tf.reshape(batch_features, (batch_features.shape[0], num_nodes, num_nodes, 1))
             # reconstructed = tf.reshape(autoencoder(tf.constant(batch_features)),
             #                            (batch_features.shape[0], num_nodes, num_nodes, 1))
@@ -96,7 +96,8 @@ def main():
     cols = adj_matrices.reshape(adj_matrices.shape[0], adj_matrices.shape[1] * adj_matrices.shape[2])
     #print(adj_matrices.shape, cols.shape)
     outputs = tf.reshape(autoencoder(tf.constant(cols)), (cols.shape[0], num_nodes, num_nodes))
-    outputs = np.array([out.numpy() for out in outputs])
+    #outputs = np.array([out.numpy() for out in outputs])
+    outputs = np.array([out.numpy() for out in outputs])+adj_matrices
     #print(outputs.shape)
 
     if save_graphs:
@@ -112,6 +113,7 @@ def main():
     for i in trange(cols.shape[0], desc='edge expansions: '):
         original = adj_matrices[i]
         new = outputs[i]
+        #new = outputs[i]+original
         #print(original-new)
         # print(adj_mat_to_norm_laplacian(new))
         # print(new)
@@ -165,7 +167,7 @@ def metrics(values):
     sparsity_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(sparsity), scale=st.sem(sparsity))
     expansion_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(expansion_loss), scale=st.sem(expansion_loss))
     benchmark_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(benchmark_loss), scale=st.sem(benchmark_loss))
-    #return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
+    return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
     return mean_sparsity, mean_expansion_loss, mean_benchmark_loss
 
 def read_ratios(file):

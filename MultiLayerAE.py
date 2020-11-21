@@ -134,9 +134,14 @@ def custom_eigenloss(output, original):
 def loss(model, original, l2_const, l1_const, eigen_const):
     # print(original)
     # print(model(original))
-    reconstruction_error = l2_const * tf.reduce_mean(tf.square(model(original) - original)) \
-                           + l1_const * tf.reduce_mean(tf.abs(model(original))) \
-                           - eigen_const * custom_eigenloss(model(original), original)
+    #reconstruction_error = l2_const * tf.reduce_mean(tf.square(model(original) - original)) \
+    #                       + l1_const * tf.reduce_mean(tf.abs(model(original))) \
+    #                       - eigen_const * custom_eigenloss(model(original), original)
+    full_output = model(original)+original
+    reconstruction_error = l2_const * tf.reduce_mean(tf.square(model(original))) \
+                           + l1_const * tf.reduce_mean(tf.abs(full_output)) \
+                           - eigen_const * custom_eigenloss(full_output, original)
+                           #- eigen_const * custom_eigenloss(model(original), original)
 
     return reconstruction_error
 
