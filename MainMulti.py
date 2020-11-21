@@ -12,8 +12,8 @@ def main():
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     # tf.keras.backend.set_floatx('float64')
 
-    num_nodes = 4
-    #num_nodes = 28
+    #num_nodes = 4
+    num_nodes = 28
     #num_nodes = 100
     # probabilities = [.5, .6, .7, .8, .9]
     probabilities = [.75]
@@ -28,7 +28,7 @@ def main():
 
     #batch_size = 32
     batch_size = 10
-    epochs = 50
+    epochs = 20
     learning_rate = 1e-2
     original_dim = num_nodes ** 2
     l2_reg_const = 1
@@ -65,7 +65,7 @@ def main():
     #opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             learning_rate,
-            decay_steps=40*(num_graphs//batch_size),
+            decay_steps=10*(num_graphs//batch_size),
             decay_rate=0.1,
             staircase=True)
     opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
