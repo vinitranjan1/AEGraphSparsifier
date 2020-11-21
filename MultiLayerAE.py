@@ -107,11 +107,12 @@ def custom_eigenloss(output, original):
         square_output = np.reshape(first_output, (new_size, new_size))
         square_original = np.reshape(first_orig, (new_size, new_size))
 
-        G = create_graph_from_output(square_output, square_original)
-        G = adj_mat_to_norm_laplacian(G)
-        # print(G, G.shape)
-        # exit(0)
-        eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
+        # G = create_graph_from_output(square_output, square_original)
+        # G = adj_mat_to_norm_laplacian(G)
+        # eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
+        G = square_output
+
+        eigvals, eigvecs = np.linalg.eig(G)
         idx = np.argsort(eigvals)
         eigvals = eigvals[idx]
         eigvecs = eigvecs[:, idx]
@@ -140,7 +141,7 @@ def loss(model, original, l2_const, l1_const, eigen_const):
     full_output = model(original)+original
     reconstruction_error = l2_const * tf.reduce_mean(tf.square(model(original))) \
                            + l1_const * tf.reduce_mean(tf.abs(full_output)) \
-                           - eigen_const * custom_eigenloss(full_output, original)
+                           + eigen_const * custom_eigenloss(full_output, original)
                            #- eigen_const * custom_eigenloss(model(original), original)
 
     return reconstruction_error
