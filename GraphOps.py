@@ -121,7 +121,7 @@ def expected_num_edges(original, new, edge_function=max):
         for j in range(i+1, original.shape[0]):
             if original[i][j]:
                 #out += edge_function(new[i][j], new[j][i])
-                out += np.mean([new[i][j], new[j][i]])
+                out += min(1, np.mean([new[i][j], new[j][i]]))
     return out
 
 
