@@ -33,7 +33,8 @@ def generate_ba_graphs(num_nodes, num_connections, num_graph_copies, graph_file=
 
 
 def estimate_edge_expansion(norm_laplacian):
-    eigvals = np.linalg.eigvals(scipy.sparse.csr_matrix.todense(norm_laplacian))
+    #eigvals = np.linalg.eigvals(scipy.sparse.csr_matrix.todense(norm_laplacian))
+    eigvals = np.linalg.eigvals(norm_laplacian)
     # print('vals')
     # print(eigvals)
     # print(np.sort(eigvals))
@@ -73,8 +74,9 @@ def generate_benchmark_expansions(original, new_num_edges, num_trials=10):
 def adj_mat_to_norm_laplacian(adj_mat):
     #G = nx.from_numpy_matrix(adj_mat)
     #return nx.normalized_laplacian_matrix(G)
-    G = csgraph.csgraph_from_dense(adj_mat)
-    return csgraph.laplacian(G, normed=True)
+    #G = csgraph.csgraph_from_dense(adj_mat)
+    #return csgraph.laplacian(G, normed=True)
+    return csgraph.laplacian(adj_mat, normed=True)
 
 
 def create_random_subgraph(original, num_new_edges):
@@ -121,7 +123,7 @@ def expected_num_edges(original, new, edge_function=max):
         for j in range(i+1, original.shape[0]):
             if original[i][j]:
                 #out += edge_function(new[i][j], new[j][i])
-                out += min(1, np.mean([new[i][j], new[j][i]]))
+                out += max(0, min(1, np.mean([new[i][j], new[j][i]])))
     return out
 
 

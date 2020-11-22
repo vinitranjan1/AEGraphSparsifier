@@ -12,13 +12,13 @@ def main():
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     # tf.keras.backend.set_floatx('float64')
 
-    num_nodes = 28
+    num_nodes = 10
     #num_nodes = 28
     #num_nodes = 100
     # probabilities = [.5, .6, .7, .8, .9]
     probabilities = [.75]
     num_graphs = 100
-    #num_graphs = 200
+    #num_graphs = 1000
     graph_file = None
     adj_mat_file = 'graphs/adj_mat.npy'
     out_mat_file = 'graphs/out_mat.npy'
@@ -28,12 +28,12 @@ def main():
 
     batch_size = 32
     #batch_size = 10
-    epochs = 15
-    learning_rate = 1e-2
+    epochs = 50
+    learning_rate = 1e-3
     original_dim = num_nodes ** 2
     l2_reg_const = 1
     l1_reg_const = 1
-    eigen_const = 5e-3  # should be positive
+    eigen_const = 1e-3  # should be positive
     # l1_reg_const = 1e-4
 
     # intermediate_dim = 256
@@ -65,7 +65,7 @@ def main():
     #opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             learning_rate,
-            decay_steps=10*(num_graphs//batch_size),
+            decay_steps=50*(num_graphs//batch_size),
             decay_rate=0.1,
             staircase=True)
     opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
@@ -132,13 +132,15 @@ def main():
     #print(values)
     print(f"Correlation between input and output: {corr}")
     pretty_print(values[-10:])
-    print(metrics(values))
-    ax = sns.kdeplot(adj_matrices.flatten(), bw_method=0.01)
-    sns.kdeplot(outputs.flatten(), bw_method=0.01)
-    ax.set(xlabel='inputs/outputs', ylabel='density')
+    m = metrics(values)
+    print(f"Sparsification: {m[0]} \nExpansion % preserved: {m[1]} \n% better than random: {m[2]}")
+    #ax = sns.kdeplot(adj_matrices.flatten(), bw_method=0.01)
+    #ax.set(xlabel='inputs/outputs', ylabel='density', xlim=(-1, 2))
+    ax = sns.kdeplot(outputs.flatten(), bw_method=0.01)
+    ax.set(xlabel='outputs', ylabel='density', xlim=(-1, 2)) # 
     plt.figure()
-    ax2 = sns.kdeplot(adj_matrices.flatten()-outputs.flatten(), bw_method=0.01)
-    ax2.set(xlabel='error', ylabel='density')
+    ax2 = sns.kdeplot(outputs.flatten()-adj_matrices.flatten(), bw_method=0.01)
+    ax2.set(xlabel='error', ylabel='density', xlim=(-2, 2)) # 
     
     #print(autoencoder.encoder.hidden_layer1.get_weights())
     
@@ -157,18 +159,30 @@ def pretty_print(values):
 
 def metrics(values):
     # identify performance metrics based on values
+#    value_arr = np.array(values)
+#    sparsity = value_arr[:, 0]/value_arr[:, 1]
+#    expansion_loss = value_arr[:, 2]/value_arr[:, 4]
+#    benchmark_loss = value_arr[:, 2]/value_arr[:, 6]
+#    mean_sparsity = np.mean(sparsity)
+#    mean_expansion_loss = np.mean(expansion_loss) 
+#    mean_benchmark_loss = np.mean(benchmark_loss)
+#    sparsity_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(sparsity), scale=st.sem(sparsity))
+#    expansion_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(expansion_loss), scale=st.sem(expansion_loss))
+#    benchmark_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(benchmark_loss), scale=st.sem(benchmark_loss))
+#    return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
+#    return mean_sparsity, mean_expansion_loss, mean_benchmark_loss
+    epsilon = 1e-7
     value_arr = np.array(values)
     sparsity = value_arr[:, 0]/value_arr[:, 1]
-    expansion_loss = value_arr[:, 2]/value_arr[:, 4]
-    benchmark_loss = value_arr[:, 2]/value_arr[:, 6]
+    expansion = (value_arr[:, 4]+epsilon)/(value_arr[:, 2]+epsilon)
+    vs_benchmark = (value_arr[:, 4]-value_arr[:,6])/(value_arr[:, 6]+epsilon)
     mean_sparsity = np.mean(sparsity)
-    mean_expansion_loss = np.mean(expansion_loss) 
-    mean_benchmark_loss = np.mean(benchmark_loss)
+    mean_expansion = np.mean(expansion) 
+    mean_benchmark = np.mean(vs_benchmark)
     sparsity_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(sparsity), scale=st.sem(sparsity))
-    expansion_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(expansion_loss), scale=st.sem(expansion_loss))
-    benchmark_loss_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(benchmark_loss), scale=st.sem(benchmark_loss))
-    return sparsity_CI, expansion_loss_CI, benchmark_loss_CI
-    return mean_sparsity, mean_expansion_loss, mean_benchmark_loss
+    expansion_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(expansion), scale=st.sem(expansion))
+    benchmark_CI = st.t.interval(0.95, len(values)-1, loc=np.mean(vs_benchmark), scale=st.sem(vs_benchmark))
+    return sparsity_CI, expansion_CI, benchmark_CI
 
 def read_ratios(file):
     ratio_file = file

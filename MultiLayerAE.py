@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import itertools
 from GraphOps import *
 
 
@@ -98,6 +99,7 @@ class MultiLayerAutoencoder(tf.keras.Model):
 def custom_eigenloss(output, original):
     # model_outs = tf.zeros(tf.shape(output))
     model_outs = np.zeros(tf.shape(output), dtype=np.float32)
+    #dLdAs = np.zeros(tf.shape(output), dtype=np.float32)
     lambda1_vals = []
     for i in range(tf.shape(output)[0]):
         first_output = output[i]
@@ -110,9 +112,31 @@ def custom_eigenloss(output, original):
         # G = create_graph_from_output(square_output, square_original)
         # G = adj_mat_to_norm_laplacian(G)
         # eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
-        G = square_output
+        #G = square_output
+        G = 0.5*(square_output+np.transpose(square_output))
+        
+        epsilon = 1e-1
+        D_vec = np.sum(G, 0)+epsilon
+        D12_vec = np.power(D_vec, -0.5)
+        D32_vec = np.power(D_vec, -1.5)
+        sumd12 = np.outer(D12_vec, D12_vec)
+        D32 = np.array([[di+dj for di in D32_vec] for dj in D32_vec])
+        
+        D = np.diag(D_vec)
+        D12 = np.diag(D12_vec)
+        dLdA = D32 * (G @ D12)- sumd12 * np.ones(G.shape)
+        if np.any(np.isnan(dLdA)):
+           dLdA = np.zeros(dLdA.shape) # zero it out to avoid affecting gradients
+        #print(dLdA)
+        L = adj_mat_to_norm_laplacian(G)
 
-        eigvals, eigvecs = np.linalg.eig(G)
+        
+        try:
+            eigvals, eigvecs = np.linalg.eig(L)
+        except Exception:
+            fail_value = 100
+            eigvals = np.repeat(fail_value, square_output.shape[0])
+            eigvecs = np.zeros(square_output.shape)
         idx = np.argsort(eigvals)
         eigvals = eigvals[idx]
         eigvecs = eigvecs[:, idx]
@@ -120,16 +144,22 @@ def custom_eigenloss(output, original):
         lambda1_vals.append(lambda_1)
         l1_eigvec = eigvecs[:, 1]
         eig_outer = np.outer(l1_eigvec, l1_eigvec)
-        eig_outer = np.reshape(eig_outer, len(l1_eigvec) ** 2)
-        model_outs[i] = eig_outer
+        grad = dLdA * eig_outer
+        #eig_outer = np.reshape(eig_outer, len(l1_eigvec) ** 2)
+        grad = np.reshape(grad, len(l1_eigvec) ** 2)
+        model_outs[i] = grad
+        #dLdA = np.reshape(eig_outer, len(l1_eigvec) ** 2)
+        #dLdAs[i] = dLdA
     model_outs = tf.convert_to_tensor(model_outs)
+    #dLdAs = tf.convert_to_tensor(dLdAs)
 
     def grad(dABydW):
         deBydW = dABydW * model_outs  # this is element wise multiply
+        #deBydW = dABydW * dLdAs * model_outs
         return deBydW, None
         # return None, deBydW
 
-    return tf.constant(np.sum(lambda1_vals), dtype=tf.float32), grad
+    return tf.constant(np.mean(lambda1_vals), dtype=tf.float32), grad
 
 
 def loss(model, original, l2_const, l1_const, eigen_const):
