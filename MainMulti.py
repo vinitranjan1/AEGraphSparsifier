@@ -12,7 +12,7 @@ def main():
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     # tf.keras.backend.set_floatx('float64')
 
-    num_nodes = 10
+    num_nodes = 4
     #num_nodes = 28
     #num_nodes = 100
     # probabilities = [.5, .6, .7, .8, .9]
@@ -26,23 +26,23 @@ def main():
 
     adj_matrices, laplacians = generate_graphs(num_nodes, probabilities, num_graphs)
 
-    batch_size = 32
+    batch_size = 100
     #batch_size = 10
-    epochs = 50
-    learning_rate = 1e-3
+    epochs = 20
+    learning_rate = 1e-2
     original_dim = num_nodes ** 2
     l2_reg_const = 1
     l1_reg_const = 1
-    eigen_const = 1e-3  # should be positive
+    eigen_const = 0.1  # should be positive
     # l1_reg_const = 1e-4
 
     # intermediate_dim = 256
-    # inter_dim1 = 256
-    # inter_dim2 = 128
-    # inter_dim3 = 64
-    inter_dim1 = original_dim
-    inter_dim2 = original_dim
-    inter_dim3 = original_dim
+    inter_dim1 = 256
+    inter_dim2 = 128
+    inter_dim3 = 64
+    #inter_dim1 = original_dim
+    #inter_dim2 = original_dim
+    #inter_dim3 = original_dim
 
     training_features = adj_matrices
 
@@ -65,7 +65,7 @@ def main():
     #opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             learning_rate,
-            decay_steps=50*(num_graphs//batch_size),
+            decay_steps=100*(num_graphs//batch_size),
             decay_rate=0.1,
             staircase=True)
     opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
@@ -141,6 +141,7 @@ def main():
     plt.figure()
     ax2 = sns.kdeplot(outputs.flatten()-adj_matrices.flatten(), bw_method=0.01)
     ax2.set(xlabel='error', ylabel='density', xlim=(-2, 2)) # 
+    plt.show()
     
     #print(autoencoder.encoder.hidden_layer1.get_weights())
     

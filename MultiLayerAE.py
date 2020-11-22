@@ -3,6 +3,9 @@ import tensorflow as tf
 import itertools
 from GraphOps import *
 
+import autograd.numpy as np
+from autograd import jacobian
+
 
 def plateau_relu(x):
     return tf.nn.relu(-1 * tf.nn.relu(1-x) + 1)
@@ -66,12 +69,12 @@ class MultiLayerDecoder(tf.keras.layers.Layer):
         )
     def call(self, code):
         # layer1 = self.hidden_layer1(code)
-        #layer1 = code  # quick fix to remove the double bottleneck layer
-        #layer2 = self.hidden_layer2(layer1)
-        #layer3 = self.hidden_layer3(layer2)
-        #return self.output_layer(layer3)
+        layer1 = code  # quick fix to remove the double bottleneck layer
+        layer2 = self.hidden_layer2(layer1)
+        layer3 = self.hidden_layer3(layer2)
+        return self.output_layer(layer3)
         # can leave this and comment out previous four lines to perform network surgery
-        return self.output_layer(code) 
+        #return self.output_layer(code) 
 
 
 class MultiLayerAutoencoder(tf.keras.Model):
@@ -97,6 +100,14 @@ class MultiLayerAutoencoder(tf.keras.Model):
 
 @tf.custom_gradient
 def custom_eigenloss(output, original):
+    
+    def Laplacian_for_grad(A):
+        A = A-np.diag(np.diag(A)) # get rid of diagonal elements
+        A = 0.5*(A+np.transpose(A)) # symmetrize
+        D_vec = np.sum(A, 0)
+        D12 = np.diag(np.power(D_vec, -0.5))
+        return D12 @ A @ D12
+    
     # model_outs = tf.zeros(tf.shape(output))
     model_outs = np.zeros(tf.shape(output), dtype=np.float32)
     #dLdAs = np.zeros(tf.shape(output), dtype=np.float32)
@@ -113,30 +124,33 @@ def custom_eigenloss(output, original):
         # G = adj_mat_to_norm_laplacian(G)
         # eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
         #G = square_output
-        G = 0.5*(square_output+np.transpose(square_output))
         
-        epsilon = 1e-1
-        D_vec = np.sum(G, 0)+epsilon
-        D12_vec = np.power(D_vec, -0.5)
-        D32_vec = np.power(D_vec, -1.5)
-        sumd12 = np.outer(D12_vec, D12_vec)
-        D32 = np.array([[di+dj for di in D32_vec] for dj in D32_vec])
-        
-        D = np.diag(D_vec)
-        D12 = np.diag(D12_vec)
-        dLdA = D32 * (G @ D12)- sumd12 * np.ones(G.shape)
-        if np.any(np.isnan(dLdA)):
-           dLdA = np.zeros(dLdA.shape) # zero it out to avoid affecting gradients
-        #print(dLdA)
-        L = adj_mat_to_norm_laplacian(G)
-
+        grad_fun = jacobian(Laplacian_for_grad)
+        dLdA = grad_fun(square_output)
+#        G = 0.5*(square_output+np.transpose(square_output))
+#        
+#        epsilon = 1e-2
+#        D_vec = np.sum(G, 0)+epsilon
+#        D12_vec = np.power(D_vec, -0.5)
+#        D32_vec = np.power(D_vec, -1.5)
+#        sumd12 = np.outer(D12_vec, D12_vec)
+#        D32 = np.array([[di+dj for di in D32_vec] for dj in D32_vec])
+#        
+#        D = np.diag(D_vec)
+#        D12 = np.diag(D12_vec)
+#        dLdA = D32 * (G @ D12)- sumd12 * np.ones(G.shape)
+#        if np.any(np.isnan(dLdA)):
+#           dLdA = np.zeros(dLdA.shape) # zero it out to avoid affecting gradients
+#        #print(dLdA)
+#        L = adj_mat_to_norm_laplacian(G)
+        L = adj_mat_to_norm_laplacian(0.5*(square_output+np.transpose(square_output)))
         
         try:
             eigvals, eigvecs = np.linalg.eig(L)
         except Exception:
-            fail_value = 100
+            fail_value = -100
             eigvals = np.repeat(fail_value, square_output.shape[0])
-            eigvecs = np.zeros(square_output.shape)
+            eigvecs = np.ones(square_output.shape)
         idx = np.argsort(eigvals)
         eigvals = eigvals[idx]
         eigvecs = eigvecs[:, idx]
@@ -144,10 +158,13 @@ def custom_eigenloss(output, original):
         lambda1_vals.append(lambda_1)
         l1_eigvec = eigvecs[:, 1]
         eig_outer = np.outer(l1_eigvec, l1_eigvec)
-        grad = dLdA * eig_outer
+        gr = np.einsum('ijkl,kl',dLdA, eig_outer)
         #eig_outer = np.reshape(eig_outer, len(l1_eigvec) ** 2)
-        grad = np.reshape(grad, len(l1_eigvec) ** 2)
-        model_outs[i] = grad
+        gr = np.reshape(gr, len(l1_eigvec) ** 2)
+        gr = gr-np.diag(np.diag(gr)) # remove diagonal elements
+        if np.any(np.isnan(gr)):
+            gr = np.zeros(gr.shape)
+        model_outs[i] = gr
         #dLdA = np.reshape(eig_outer, len(l1_eigvec) ** 2)
         #dLdAs[i] = dLdA
     model_outs = tf.convert_to_tensor(model_outs)
@@ -171,8 +188,8 @@ def loss(model, original, l2_const, l1_const, eigen_const):
     full_output = model(original)+original
     reconstruction_error = l2_const * tf.reduce_mean(tf.square(model(original))) \
                            + l1_const * tf.reduce_mean(tf.abs(full_output)) \
-                           + eigen_const * custom_eigenloss(full_output, original)
-                           #- eigen_const * custom_eigenloss(model(original), original)
+                           - eigen_const * custom_eigenloss(full_output, original)
+                           #+ eigen_const * custom_eigenloss(model(original), original)
 
     return reconstruction_error
 
