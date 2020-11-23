@@ -3,7 +3,7 @@ import tensorflow as tf
 import itertools
 from GraphOps import *
 
-import autograd.numpy as np
+import autograd.numpy as numpy
 from autograd import jacobian
 
 
@@ -102,10 +102,10 @@ class MultiLayerAutoencoder(tf.keras.Model):
 def custom_eigenloss(output, original):
     
     def Laplacian_for_grad(A):
-        A = A-np.diag(np.diag(A)) # get rid of diagonal elements
-        A = 0.5*(A+np.transpose(A)) # symmetrize
-        D_vec = np.sum(A, 0)
-        D12 = np.diag(np.power(D_vec, -0.5))
+        A = A-numpy.diag(numpy.diag(A)) # get rid of diagonal elements
+        A = 0.5*(A+numpy.transpose(A)) # symmetrize
+        D_vec = numpy.sum(A, 0)
+        D12 = numpy.diag(numpy.power(D_vec, -0.5))
         return D12 @ A @ D12
     
     # model_outs = tf.zeros(tf.shape(output))
@@ -125,8 +125,10 @@ def custom_eigenloss(output, original):
         # eigvals, eigvecs = np.linalg.eig(scipy.sparse.csr_matrix.todense(G))
         #G = square_output
         
-        grad_fun = jacobian(Laplacian_for_grad)
-        dLdA = grad_fun(square_output)
+        #grad_fun = jacobian(Laplacian_for_grad)
+        #dLdA = grad_fun(square_output)
+        #print(dLdA)
+        
 #        G = 0.5*(square_output+np.transpose(square_output))
 #        
 #        epsilon = 1e-2
@@ -158,7 +160,9 @@ def custom_eigenloss(output, original):
         lambda1_vals.append(lambda_1)
         l1_eigvec = eigvecs[:, 1]
         eig_outer = np.outer(l1_eigvec, l1_eigvec)
-        gr = np.einsum('ijkl,kl',dLdA, eig_outer)
+        #gr = np.einsum('ijkl,kl',dLdA, eig_outer)
+        gr = np.zeros(eigvecs.shape) 
+        
         #eig_outer = np.reshape(eig_outer, len(l1_eigvec) ** 2)
         gr = np.reshape(gr, len(l1_eigvec) ** 2)
         gr = gr-np.diag(np.diag(gr)) # remove diagonal elements

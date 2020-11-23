@@ -7,13 +7,15 @@ from tqdm import tqdm, trange
 from GraphOps import *
 from MultiLayerAE import *
 
+sns.set(font_scale=2) 
+
 
 def main():
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     # tf.keras.backend.set_floatx('float64')
 
-    num_nodes = 4
-    #num_nodes = 28
+    #num_nodes = 4
+    num_nodes = 28
     #num_nodes = 100
     # probabilities = [.5, .6, .7, .8, .9]
     probabilities = [.75]
@@ -28,12 +30,12 @@ def main():
 
     batch_size = 100
     #batch_size = 10
-    epochs = 20
+    epochs = 100
     learning_rate = 1e-2
     original_dim = num_nodes ** 2
     l2_reg_const = 1
-    l1_reg_const = 1
-    eigen_const = 0.1  # should be positive
+    l1_reg_const = 0.5
+    eigen_const = 1e-2  # should be positive
     # l1_reg_const = 1e-4
 
     # intermediate_dim = 256
@@ -137,10 +139,10 @@ def main():
     #ax = sns.kdeplot(adj_matrices.flatten(), bw_method=0.01)
     #ax.set(xlabel='inputs/outputs', ylabel='density', xlim=(-1, 2))
     ax = sns.kdeplot(outputs.flatten(), bw_method=0.01)
-    ax.set(xlabel='outputs', ylabel='density', xlim=(-1, 2)) # 
+    ax.set(xlabel='outputs', ylabel='density', xlim=(-0.5, 1.5)) # 
     plt.figure()
-    ax2 = sns.kdeplot(outputs.flatten()-adj_matrices.flatten(), bw_method=0.01)
-    ax2.set(xlabel='error', ylabel='density', xlim=(-2, 2)) # 
+    ax2 = sns.kdeplot(outputs.flatten()-adj_matrices.flatten(), bw_method=0.1)
+    ax2.set(xlabel='error', ylabel='density', xlim=(-0.5, 0.5)) # 
     plt.show()
     
     #print(autoencoder.encoder.hidden_layer1.get_weights())
